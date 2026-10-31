@@ -1,0 +1,11 @@
+{
+  "name": "Vendas Premiadas — Rende Mais",
+  "short_name": "Vendas Premiadas",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1F3864",
+  "theme_color": "#1F3864",
+  "description": "Campanhas de venda de itens por loja: pontos, metas, ranking e prêmio.",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

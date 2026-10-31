@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vendas Premiadas</title>
+<meta name="theme-color" content="#1F3864">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{
+  color-scheme:light;
+  --navy:#1F3864; --amber:#FFBF00;
+  --plane:#f2f3f6; --surface:#fff; --surface-2:#f7f8fa;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --baseline:#c3c2b7;
+  --good:#0ca30c; --good-text:#006300; --warning:#b07a00; --critical:#d03b3b;
+  --bar:#2a78d6; --radius:14px;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  color-scheme:dark; --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#211f1e;
+  --ink:#fff; --ink-2:#c3c2b7; --muted:#898781; --grid:#2c2c2a; --baseline:#383835;
+  --good-text:#2fc22f; --warning:#fab219; --bar:#3987e5;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark; --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#211f1e;
+  --ink:#fff; --ink-2:#c3c2b7; --muted:#898781; --grid:#2c2c2a; --baseline:#383835;
+  --good-text:#2fc22f; --warning:#fab219; --bar:#3987e5;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--plane);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+header.top{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:20}
+header.top .dot{width:11px;height:11px;border-radius:50%;background:var(--amber)}
+header.top b{font-size:17px}
+header.top .sp{flex:1}
+header.top .who{font-size:13px;opacity:.85}
+header.top button{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.card{background:var(--surface);border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+h2{font-size:20px;margin:0 0 4px} h3{font-size:16px;margin:0 0 10px}
+.desc{color:var(--ink-2);font-size:13px;margin:0}
+.muted{color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--grid);background:var(--surface);border-radius:999px;padding:6px 12px;cursor:pointer;font-size:13px}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn{background:var(--navy);color:#fff;border:0;border-radius:9px;padding:9px 14px;font-weight:600;cursor:pointer}
+.btn.sec{background:var(--surface-2);color:var(--ink);border:1px solid var(--grid)}
+.btn.amb{background:var(--amber);color:#1b1b1b}
+.btn:disabled{opacity:.5;cursor:default}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.kpi{background:var(--surface-2);border-radius:12px;padding:10px 12px}
+.kpi .l{font-size:12px;color:var(--ink-2)} .kpi .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--muted)}
+@media (max-width:640px){ .kpis{grid-template-columns:repeat(2,1fr)} }
+.lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.camp{background:var(--surface);border-radius:var(--radius);padding:14px;cursor:pointer;border:2px solid transparent}
+.camp:hover{border-color:var(--navy)}
+.camp .t{font-weight:700;font-size:16px}
+.pill{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;background:var(--surface-2);color:var(--ink-2)}
+.pill.ok{color:var(--good-text)} .pill.warn{color:var(--warning)} .pill.bad{color:var(--critical)}
+.tbl-wrap{max-height:70vh;overflow-y:auto;border-radius:10px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;table-layout:auto}
+th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--grid);font-size:14px}
+th{position:sticky;top:0;background:var(--surface);z-index:2;font-size:12px;color:var(--ink-2);font-weight:600}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+tr.lider td{font-weight:700}
+.lojaB{display:inline-block;color:#fff;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700;margin-right:6px}
+.bar{position:relative;height:10px;background:var(--surface-2);border-radius:6px;min-width:70px;overflow:hidden}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--bar);border-radius:6px}
+.bar b{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink)}
+@media (max-width:640px){ .hm{display:none} th,td{padding:7px 4px;font-size:13px} }
+.aviso{background:#fff6d6;color:#5a4300;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+:root[data-theme="dark"] .aviso{background:#3a3000;color:#ffe9a6}
+.erro{background:#fde7e7;color:#7a1414}
+pre.wa{white-space:pre-wrap;background:var(--surface-2);border-radius:10px;padding:12px;font-size:13px;margin:0 0 8px}
+svg text{fill:var(--ink-2);font-size:11px}
+/* login */
+#login{position:fixed;inset:0;display:none;place-items:center;background:var(--navy);padding:16px;z-index:50}
+#login .box{background:var(--surface);border-radius:16px;padding:22px;width:min(360px,100%);text-align:center}
+#login input{width:100%;padding:11px;border:1px solid var(--grid);border-radius:10px;margin:6px 0;background:var(--surface)}
+#lgSwitch{font-size:13px;color:var(--bar);cursor:pointer;margin-top:8px}
+/* editor */
+dialog{border:0;border-radius:16px;padding:0;width:min(860px,96vw);max-height:92vh;background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.ed{padding:18px;overflow-y:auto;max-height:80vh}
+.ed h4{margin:16px 0 6px;font-size:14px;color:var(--navy)}
+:root[data-theme="dark"] .ed h4{color:var(--amber)}
+.ed label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:3px}
+.ed input,.ed select{width:100%;padding:8px;border:1px solid var(--grid);border-radius:8px;background:var(--surface)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px} .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:640px){ .g2,.g3{grid-template-columns:1fr} }
+.grp{display:grid;grid-template-columns:1.3fr 1.6fr .7fr .7fr auto;gap:6px;align-items:end;padding:8px 0;border-bottom:1px dashed var(--grid)}
+@media (max-width:640px){ .grp{grid-template-columns:1fr 1fr} }
+.grp .nm{grid-column:1/-1;font-size:11px;color:var(--muted);margin-top:-2px}
+.edfoot{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--grid)}
+.x{background:none;border:0;color:var(--critical);font-size:18px;cursor:pointer}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;margin:4px 0}
+.check input{width:auto}
+</style>
+</head>
+<body>
+<div id="login"><div class="box">
+  <div style="font-size:34px">🏆</div>
+  <h2>Vendas Premiadas</h2>
+  <p class="desc" style="margin-bottom:12px">Entre com o mesmo usuário e PIN do Data Crítica.</p>
+  <div id="lgUserWrap"></div>
+  <input id="lgPin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off">
+  <button class="btn" style="width:100%;margin-top:6px" onclick="entrar()">Entrar</button>
+  <div id="lgMsg" style="color:var(--critical);font-size:13px;min-height:18px;margin-top:6px"></div>
+  <div id="lgSwitch"></div>
+</div></div>
+
+<header class="top" id="hdr" hidden>
+  <span class="dot"></span><b>Vendas Premiadas</b>
+  <span class="sp"></span>
+  <span class="who" id="hdWho"></span>
+  <button onclick="tema()" title="Tema">◐</button>
+  <button onclick="sair()">Sair</button>
+</header>
+<main id="app" hidden></main>
+
+<dialog id="dlg"><div class="ed" id="edBody"></div>
+  <div class="edfoot">
+    <button class="btn sec" onclick="$('dlg').close()">Cancelar</button>
+    <button class="btn" id="edSalvar" onclick="salvarCampanha()">Salvar campanha</button>
+  </div>
+</dialog>
+
+<script>
+/* ==============================================================
+   VENDAS PREMIADAS — campanhas de venda de itens por loja.
+   As regras ficam em cv_campanhas.config; a venda por loja/dia/grupo
+   vem do VR pelo workflow (cv_vendas) e a base da meta em cv_base.
+   Pontos, metas e prêmios são calculados AQUI, com a regra vigente.
+   ============================================================== */
+const SB_URL = "https://estciwkeihmokvlnvaum.supabase.co";
+const SB_KEY = "sb_publishable_l14fjxQmWUeu5OXlZJ35GA_-X3ESkgZ";
+const LOJAS = {1:"L01 Veneza",2:"L02 Máximo",3:"L03 Royal",4:"L04 Lojão",5:"L05 Alvorada",8:"L08 Tradição",9:"L09 Massangana"};
+const LOJA_COR = {1:"#1976D2",2:"#388E3C",3:"#C2185B",4:"#E91E63",5:"#F57C00",8:"#7B1FA2",9:"#00838F"};
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const num = (v,d=0) => v==null||!isFinite(v) ? "—" : Number(v).toLocaleString("pt-BR",{minimumFractionDigits:d,maximumFractionDigits:d});
+const brl = v => v==null ? "—" : Number(v).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const pct = v => v==null||!isFinite(v) ? "—" : num(v*100,0)+"%";
+const lojaB = l => `<span class="lojaB" style="background:${LOJA_COR[l]||"#607D8B"}">L${String(l).padStart(2,"0")}</span>`;
+const lojaNome = l => (LOJAS[l]||("Loja "+l)).replace(/^L\d+ /,"");
+
+/* ------------------------------ tema */
+function tema(){
+  const r=document.documentElement, at=r.getAttribute("data-theme");
+  const escuro = at ? at==="dark" : matchMedia("(prefers-color-scheme:dark)").matches;
+  r.setAttribute("data-theme", escuro?"light":"dark");
+  try{ localStorage.setItem("vpTema", r.getAttribute("data-theme")); }catch(e){}
+}
+try{ const t=localStorage.getItem("vpTema"); if(t) document.documentElement.setAttribute("data-theme",t); }catch(e){}
+
+/* ------------------------------ Supabase */
+const HDR = {apikey:SB_KEY, Authorization:"Bearer "+SB_KEY};
+async function sbTudo(path){
+  const out=[];
+  for(let ini=0; ini<500000; ini+=1000){
+    const r = await fetch(SB_URL+"/rest/v1/"+path,{headers:{...HDR, Range:ini+"-"+(ini+999)}});
+    if(!r.ok) throw new Error(await r.text());
+    const b = await r.json(); out.push(...b);
+    if(b.length<1000) break;
+  }
+  return out;
+}
+async function sbGrava(metodo, path, corpo){
+  const r = await fetch(SB_URL+"/rest/v1/"+path,{method:metodo,
+    headers:{...HDR,"Content-Type":"application/json",Prefer:"return=representation"},body:JSON.stringify(corpo)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+/* ------------------------------ login (mesmo cadastro do Data Crítica) */
+let sess=null, lgOutra=false;
+const normNome = s => String(s||"").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+async function sha256(t){ const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
+function ultimoNome(){ try{ return localStorage.getItem("vpUltimoNome")||""; }catch(e){ return ""; } }
+async function iniciarLogin(){
+  $("login").style.display="grid";
+  try{ window.__users = (await sbTudo("usuarios?select=id,nome,papel,loja,pin_hash&ativo=eq.true&order=nome")).filter(u=>u.papel!=="fornecedor"); }
+  catch(e){ $("lgMsg").textContent="Não consegui falar com o banco. Verifique a internet."; }
+  desenharLogin();
+}
+function desenharLogin(){
+  const ult=ultimoNome(), outra=lgOutra||!ult;
+  $("lgUserWrap").innerHTML = outra
+    ? `<input id="lgNome" placeholder="Seu nome" autocomplete="off">`
+    : `<div style="background:var(--surface-2);border-radius:10px;padding:10px;margin-bottom:6px"><b>${esc(ult)}</b><div class="desc">Digite o PIN para entrar</div></div><input type="hidden" id="lgNome" value="${esc(ult)}">`;
+  $("lgSwitch").textContent = outra ? (ult?"‹ Voltar para "+ult:"") : "Sou outra pessoa";
+  $("lgSwitch").onclick = ()=>{ lgOutra=!outra; desenharLogin(); };
+}
+async function entrar(){
+  const nome=($("lgNome")||{}).value||"", pin=$("lgPin").value.trim();
+  if(!nome.trim()||pin.length<4){ $("lgMsg").textContent="Informe seu nome e o PIN."; return; }
+  if(!window.crypto?.subtle){ $("lgMsg").textContent="Abra o app por HTTPS."; return; }
+  const ach=(window.__users||[]).filter(u=>normNome(u.nome)===normNome(nome));
+  if(!ach.length){ $("lgMsg").textContent="Usuário não encontrado."; return; }
+  const h=await sha256(pin), u=ach.find(x=>x.pin_hash===h);
+  if(!u){ $("lgMsg").textContent="PIN incorreto."; return; }
+  sess={id:u.id,nome:u.nome,papel:u.papel,loja:u.loja};
+  try{ localStorage.setItem("vpSess",JSON.stringify(sess)); localStorage.setItem("vpUltimoNome",u.nome); }catch(e){}
+  abrirApp();
+}
+function sair(){ try{ localStorage.removeItem("vpSess"); }catch(e){} location.reload(); }
+const podeEditar = () => sess && sess.papel==="gestor";
+function abrirApp(){
+  $("login").style.display="none"; $("hdr").hidden=false; $("app").hidden=false;
+  $("hdWho").textContent = sess.nome.split(" ")[0]+" · "+({gestor:"Gestor",prevencao:"Prevenção",operador:"Loja"}[sess.papel]||sess.papel);
+  carregarLista();
+}
+
+/* ------------------------------ datas e rodadas (mesma regra do workflow) */
+const iso = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const dt = s => { const [a,m,d]=String(s).slice(0,10).split("-").map(Number); return new Date(a,m-1,d); };
+const ultDia = (a,m) => new Date(a,m+1,0).getDate();     // m base 0
+const hojeD = () => { const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate()); };
+const diasEntre = (a,b) => Math.round((b-a)/864e5)+1;
+const ddmm = d => String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0");
+function rodadas(cfg){
+  const hoje=hojeD(), ini=dt(cfg.inicio), out=[];
+  if((cfg.recorrencia||"mensal")==="mensal"){
+    const fimC = cfg.fim ? dt(cfg.fim) : null;
+    let d=new Date(ini.getFullYear(),ini.getMonth(),1);
+    while(d<=hoje && (!fimC||d<=fimC)){
+      let f=new Date(d.getFullYear(),d.getMonth(),ultDia(d.getFullYear(),d.getMonth()));
+      if(fimC&&f>fimC) f=fimC;
+      out.push({id:iso(d).slice(0,7), ini:d<ini?ini:d, fim:f, nome:MESES[d.getMonth()]+"/"+d.getFullYear()});
+      d=new Date(d.getFullYear(),d.getMonth()+1,1);
+    }
+  }else if(cfg.fim && ini<=hoje){
+    out.push({id:"unica", ini, fim:dt(cfg.fim), nome:ddmm(ini)+" a "+ddmm(dt(cfg.fim))});
+  }
+  return out;
+}
+
+/* ------------------------------ estado */
+let CAMPS=[], PRODS={}, SEL=null, DADOS=null, RODADA=null;
+
+async function carregarLista(){
+  $("app").innerHTML = `<div class="card muted">Carregando campanhas…</div>`;
+  try{
+    CAMPS = await sbTudo("cv_campanhas?select=*&order=ativa.desc,id.desc");
+    (await sbTudo("cv_produtos?select=id,descricao")).forEach(p=>PRODS[p.id]=p.descricao);
+  }catch(e){
+    $("app").innerHTML = `<div class="card aviso erro"><b>Não consegui ler as campanhas.</b><br>Se for a primeira vez, falta rodar o setup.sql no Supabase.<br><small>${esc(String(e.message).slice(0,200))}</small></div>`;
+    return;
+  }
+  const h = new URLSearchParams(location.hash.slice(1));
+  if(h.get("c") && CAMPS.find(c=>String(c.id)===h.get("c"))) return abrirCampanha(Number(h.get("c")), h.get("r"));
+  desenharLista();
+}
+function desenharLista(){
+  history.replaceState(null,"",location.pathname);
+  SEL=null;
+  const card = c => {
+    const cfg=c.config, r=rodadas(cfg), atual=r[r.length-1];
+    const st = !c.ativa ? `<span class="pill">encerrada</span>`
+      : c.ultimo_erro ? `<span class="pill bad">erro na carga</span>`
+      : `<span class="pill ok">ativa</span>`;
+    return `<div class="camp" onclick="abrirCampanha(${c.id})">
+      <div class="row" style="justify-content:space-between"><span class="t">${esc(cfg.icone||"🏆")} ${esc(c.nome)}</span>${st}</div>
+      <p class="desc" style="margin-top:6px">${(cfg.grupos||[]).map(g=>esc(g.nome)+" <b>"+num(g.peso,g.peso%1?1:0)+" pt</b>").join(" · ")}</p>
+      <p class="desc muted" style="margin-top:4px">${cfg.recorrencia==="mensal"?"Mensal":"Período único"} · ${(cfg.lojas||[]).length} lojas${atual?" · rodada "+esc(atual.nome):""}</p>
+    </div>`;
+  };
+  const at=CAMPS.filter(c=>c.ativa), enc=CAMPS.filter(c=>!c.ativa);
+  $("app").innerHTML = `
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <div><h2>Campanhas de venda</h2><p class="desc">Competição entre lojas por itens específicos. Ranking pelo % da meta de cada loja.</p></div>
+      ${podeEditar()?`<button class="btn amb" onclick="editar(null)">+ Nova campanha</button>`:""}
+    </div>
+    ${at.length?`<div class="lista">${at.map(card).join("")}</div>`:`<div class="card muted">Nenhuma campanha ativa.</div>`}
+    ${enc.length?`<h3 style="margin-top:20px">Encerradas</h3><div class="lista">${enc.map(card).join("")}</div>`:""}`;
+}
+
+async function abrirCampanha(id, rod){
+  SEL = CAMPS.find(c=>c.id===id);
+  $("app").innerHTML = `<div class="card muted">Carregando ${esc(SEL.nome)}…</div>`;
+  const [v,b] = await Promise.all([
+    sbTudo(`cv_vendas?select=loja,dia,grupo,qtd,qtd_oferta,valor&campanha_id=eq.${id}&order=dia`),
+    sbTudo(`cv_base?select=rodada,modo,loja,grupo,qtd,qtd_oferta,dias,ini,fim&campanha_id=eq.${id}`)
+  ]);
+  DADOS={vendas:v, base:b};
+  const rs = rodadas(SEL.config);
+  RODADA = rs.find(r=>r.id===rod) || rs[rs.length-1] || null;
+  desenharCampanha();
+}
+
+/* ------------------------------ o cálculo */
+function calcular(cfg, rod){
+  const grupos = Object.fromEntries((cfg.grupos||[]).map(g=>[g.id,g]));
+  const contaOferta = cfg.regras?.contar_oferta!==false;
+  const q = x => contaOferta ? Number(x.qtd) : Number(x.qtd)-Number(x.qtd_oferta);
+  const pts = x => grupos[x.grupo] ? q(x)*Number(grupos[x.grupo].peso||0) : 0;
+  const ini=iso(rod.ini), fim=iso(rod.fim), hoje=hojeD();
+  const totDias = diasEntre(rod.ini,rod.fim);
+  const corrDias = hoje>rod.fim ? totDias : Math.max(0, diasEntre(rod.ini,hoje));
+  const fechada = hoje>rod.fim;
+  const meta = cfg.meta||{};
+  const temMeta = !meta.a_partir || rod.id==="unica" || rod.id>=meta.a_partir;
+  const modos = meta.modo==="maior" ? ["anterior","ano_passado"] : [meta.modo||"anterior"];
+  const lojas = (cfg.lojas||[]).map(Number);
+  const vRod = DADOS.vendas.filter(x=>x.dia>=ini && x.dia<=fim);
+  const ultimoDiaComVenda = vRod.reduce((m,x)=>x.dia>m?x.dia:m,"");
+
+  const linhas = lojas.map(l=>{
+    const vl = vRod.filter(x=>x.loja===l);
+    const P = vl.reduce((s,x)=>s+pts(x),0);
+    const porGrupo = {}; (cfg.grupos||[]).forEach(g=>porGrupo[g.id]=0);
+    vl.forEach(x=>{ if(porGrupo[x.grupo]!=null) porGrupo[x.grupo]+=q(x); });
+    // base e meta
+    let base=null, baseInfo="";
+    modos.forEach(m=>{
+      const bl = DADOS.base.filter(x=>x.rodada===rod.id && x.modo===m && x.loja===l);
+      if(!bl.length) return;
+      let bp = bl.reduce((s,x)=>s+pts(x),0);
+      if(rod.id==="unica"){ const d=bl[0].dias||totDias; bp = bp*totDias/d; }
+      if(base==null || bp>base){ base=bp; baseInfo=m; }
+    });
+    let M=null;
+    const fixa = meta.fixas && meta.fixas[l];
+    if(temMeta){
+      if(fixa) M=Number(fixa);
+      else if(base!=null) M=Math.max(base*(1+Number(meta.crescimento||0)/100), Number(meta.minimo||0));
+      if(M!=null && M<=0) M=null;
+    }
+    const esperado = M!=null ? M*corrDias/totDias : null;
+    const bateu = M!=null && P>=M;
+    const vp = Number(cfg.premio?.valor_ponto||0), bonus=Number(cfg.premio?.bonus_meta||0);
+    let premio = P*vp;
+    if(cfg.regras?.premio_so_com_meta && !bateu) premio=0;
+    if(bateu) premio+=bonus;
+    // série acumulada por dia
+    const serie=[]; let ac=0;
+    for(let i=0;i<corrDias;i++){
+      const d=iso(new Date(rod.ini.getFullYear(),rod.ini.getMonth(),rod.ini.getDate()+i));
+      ac += vl.filter(x=>x.dia===d).reduce((s,x)=>s+pts(x),0);
+      serie.push(ac);
+    }
+    return {loja:l, P, porGrupo, base, baseInfo, meta:M, fixa:!!fixa, esperado,
+            pMeta: M? P/M : null, ritmo: esperado? P/esperado : null, bateu, premio, serie};
+  });
+  linhas.sort((a,b)=>((b.pMeta??-1)-(a.pMeta??-1)) || (b.P-a.P));
+  linhas.forEach((x,i)=>x.pos=i+1);
+  const tot = {
+    P: linhas.reduce((s,x)=>s+x.P,0),
+    meta: linhas.every(x=>x.meta!=null) ? linhas.reduce((s,x)=>s+x.meta,0) : null,
+    premio: linhas.reduce((s,x)=>s+x.premio,0),
+    bateram: linhas.filter(x=>x.bateu).length
+  };
+  tot.pMeta = tot.meta? tot.P/tot.meta : null;
+  tot.ritmo = tot.meta? tot.P/(tot.meta*corrDias/totDias||1) : null;
+  return {linhas, tot, totDias, corrDias, fechada, temMeta, ultimoDiaComVenda};
+}
+
+/* ------------------------------ tela da campanha */
+function corPct(p){ return p==null?"":(p>=1?"ok":p>=.9?"warn":"bad"); }
+function desenharCampanha(){
+  const c=SEL, cfg=c.config, rs=rodadas(cfg);
+  history.replaceState(null,"","#c="+c.id+(RODADA?"&r="+RODADA.id:""));
+  if(!RODADA){
+    $("app").innerHTML = topoCampanha(c,rs)+`<div class="card muted">A campanha começa em ${ddmm(dt(cfg.inicio))}.</div>`; return;
+  }
+  const R = calcular(cfg, RODADA);
+  const semDados = !DADOS.vendas.length;
+  const carga = c.ultima_carga ? new Date(c.ultima_carga) : null;
+  const avisos = [];
+  if(c.ultimo_erro) avisos.push(`<div class="aviso erro"><b>A última carga do VR falhou:</b> ${esc(c.ultimo_erro)}</div>`);
+  if(semDados) avisos.push(`<div class="aviso">Ainda não há venda carregada. O VR é consultado às 06h, 08h, 10h … 20h — a campanha aparece depois da próxima carga.</div>`);
+  if(!R.temMeta) avisos.push(`<div class="aviso">Rodada de <b>base</b>: ainda sem meta (as metas começam em ${esc(cfg.meta.a_partir)}). Ranking por pontos.</div>`);
+  else if(R.linhas.some(x=>x.meta==null)) avisos.push(`<div class="aviso">Loja sem venda na base e sem meta mínima: fica sem % até ganhar meta fixa no editor.</div>`);
+
+  const vPonto = Number(cfg.premio?.valor_ponto||0);
+  const gruposCols = (cfg.grupos||[]);
+  const rotRitmo = R.fechada ? "" : `<th class="hm">Ritmo</th>`;
+  $("app").innerHTML = topoCampanha(c,rs) + avisos.join("") + `
+  <div class="card">
+    <div class="kpis">
+      <div class="kpi"><div class="l">Pontos da rede</div><div class="v">${num(R.tot.P)}</div><div class="s">${R.tot.meta?"meta "+num(R.tot.meta):"sem meta"}</div></div>
+      <div class="kpi"><div class="l">% da meta (rede)</div><div class="v">${pct(R.tot.pMeta)}</div><div class="s">${R.fechada?"rodada encerrada":"dia "+R.corrDias+" de "+R.totDias}</div></div>
+      <div class="kpi"><div class="l">${R.fechada?"Lojas que bateram":"Ritmo da rede"}</div><div class="v">${R.fechada?R.tot.bateram+" de "+R.linhas.length:pct(R.tot.ritmo)}</div><div class="s">${R.fechada?"":"100% = no caminho da meta"}</div></div>
+      <div class="kpi"><div class="l">Prêmio ${R.fechada?"apurado":"acumulado"}</div><div class="v">${brl(R.tot.premio)}</div><div class="s">${vPonto?brl(vPonto)+" por ponto":""}${cfg.premio?.bonus_meta?" + "+brl(cfg.premio.bonus_meta)+" ao bater":""}</div></div>
+    </div>
+    <h3>Ranking — % da meta</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>#</th><th class="l">Loja</th>
+        ${gruposCols.map(g=>`<th class="hm">${esc(g.nome)}</th>`).join("")}
+        <th>Pontos</th><th class="hm">Meta</th><th style="width:26%">% da meta</th>${rotRitmo}<th class="hm">Prêmio</th></tr></thead>
+      <tbody>${R.linhas.map(x=>`<tr class="${x.pos===1&&x.P>0?"lider":""}">
+        <td>${x.pos===1&&x.P>0?"🥇":x.pos===2&&x.P>0?"🥈":x.pos===3&&x.P>0?"🥉":x.pos}</td>
+        <td class="l">${lojaB(x.loja)}${esc(lojaNome(x.loja))}</td>
+        ${gruposCols.map(g=>`<td class="hm">${num(x.porGrupo[g.id],g.unidade==="KG"?1:0)}${g.unidade==="KG"?" kg":""}</td>`).join("")}
+        <td><b>${num(x.P)}</b></td>
+        <td class="hm" title="${x.fixa?"meta fixa":x.baseInfo==="ano_passado"?"base: mesmo mês do ano passado":"base: mês anterior"}">${num(x.meta)}${x.fixa?"*":""}</td>
+        <td><div class="row" style="gap:6px;flex-wrap:nowrap"><div class="bar" style="flex:1">
+          <i style="width:${Math.min(100,(x.pMeta||0)*100)}%;${x.bateu?"background:var(--good)":""}"></i>
+          ${!R.fechada&&x.meta?`<b style="left:${Math.min(100,R.corrDias/R.totDias*100)}%" title="onde deveria estar hoje"></b>`:""}
+        </div><span class="pill ${corPct(R.fechada?x.pMeta:x.ritmo)}" style="min-width:44px;text-align:center">${pct(x.pMeta)}</span></div></td>
+        ${R.fechada?"":`<td class="hm"><span class="pill ${corPct(x.ritmo)}">${pct(x.ritmo)}</span></td>`}
+        <td class="hm">${brl(x.premio)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="desc muted" style="margin-top:8px">${R.fechada?"":"A risca preta na barra é onde a loja deveria estar hoje. Ritmo = pontos ÷ meta proporcional aos dias corridos. "}
+      Meta = ${cfg.meta?.modo==="ano_passado"?"mesmo período do ano passado":cfg.meta?.modo==="maior"?"maior entre mês anterior e ano passado":"mês anterior"} + ${num(cfg.meta?.crescimento||0)}%${cfg.meta?.minimo?" (mínimo "+num(cfg.meta.minimo)+" pts)":""}.
+      ${cfg.regras?.contar_oferta===false?"Venda em oferta não conta. ":""}
+      ${carga?"Dados do VR de "+carga.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+".":""}</p>
+  </div>
+  <div class="card"><h3>Evolução do % da meta</h3>${grafico(R)}</div>
+  <div class="card"><h3>Texto para o WhatsApp</h3><pre class="wa" id="waTxt">${esc(textoWA(c,R))}</pre>
+    <button class="btn" onclick="copiarWA(this)">Copiar texto</button></div>`;
+}
+function topoCampanha(c,rs){
+  return `<div class="row" style="justify-content:space-between;margin-bottom:12px">
+    <div><button class="btn sec" onclick="desenharLista()">‹ Campanhas</button></div>
+    ${podeEditar()?`<button class="btn sec" onclick="editar(${c.id})">✏️ Regras da campanha</button>`:""}
+  </div>
+  <h2>${esc(c.config.icone||"🏆")} ${esc(c.nome)}</h2>
+  ${rs.length>1?`<div class="chips" style="margin:10px 0 12px">${rs.slice().reverse().map(r=>`<span class="chip ${RODADA&&r.id===RODADA.id?"on":""}" onclick="trocarRodada('${r.id}')">${esc(r.nome)}</span>`).join("")}</div>`:`<div style="height:10px"></div>`}`;
+}
+function trocarRodada(id){ RODADA=rodadas(SEL.config).find(r=>r.id===id); desenharCampanha(); }
+
+function grafico(R){
+  const L=R.linhas.filter(x=>x.meta), n=R.totDias;
+  if(!L.length || !R.corrDias) return `<p class="desc muted">O gráfico aparece quando houver meta e venda na rodada.</p>`;
+  const W=760,H=240,pl=36,pr=12,pt=10,pb=24;
+  const maxY=Math.max(1.2, ...L.map(x=>x.serie.length? x.serie[x.serie.length-1]/x.meta:0))*1.05;
+  const X=i=>pl+(W-pl-pr)*(n<=1?1:i/(n-1)), Y=v=>pt+(H-pt-pb)*(1-v/maxY);
+  let g="";
+  [0,.5,1,1.5,2].filter(v=>v<=maxY).forEach(v=>{ g+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)" ${v===1?'stroke-dasharray="4 3" stroke="var(--baseline)"':""}/><text x="${pl-6}" y="${Y(v)+4}" text-anchor="end">${v*100}%</text>`; });
+  g+=`<line x1="${X(0)}" y1="${Y(1/n)}" x2="${X(n-1)}" y2="${Y(1)}" stroke="var(--ink-2)" stroke-dasharray="2 4"/>`;
+  [1,Math.ceil(n/2),n].forEach(d=>g+=`<text x="${X(d-1)}" y="${H-6}" text-anchor="middle">dia ${d}</text>`);
+  L.forEach(x=>{
+    const pts=x.serie.map((v,i)=>X(i).toFixed(1)+","+Y(v/x.meta).toFixed(1)).join(" ");
+    const lx=X(x.serie.length-1), ly=Y(x.serie[x.serie.length-1]/x.meta);
+    g+=`<polyline points="${pts}" fill="none" stroke="${LOJA_COR[x.loja]}" stroke-width="2"><title>${esc(LOJAS[x.loja])}</title></polyline><circle cx="${lx}" cy="${ly}" r="3" fill="${LOJA_COR[x.loja]}"/>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Evolução do percentual da meta por loja">${g}</svg>
+    <div class="chips" style="margin-top:6px">${L.map(x=>`<span style="font-size:12px">${lojaB(x.loja)}${esc(lojaNome(x.loja))}</span>`).join("")}
+    <span class="desc muted">· pontilhado = ritmo para chegar a 100%</span></div>`;
+}
+function textoWA(c,R){
+  const cfg=c.config, med=["🥇","🥈","🥉"];
+  const cab = `${cfg.icone||"🏆"} *${c.nome.toUpperCase()}* — ${RODADA.nome}\n`
+    + (R.fechada?"*Resultado final*\n":`Parcial até ${R.ultimoDiaComVenda?ddmm(dt(R.ultimoDiaComVenda)):"hoje"} (dia ${R.corrDias} de ${R.totDias})\n`);
+  const lin = R.linhas.map((x,i)=>`${med[i]||(i+1)+"º"} ${lojaNome(x.loja)} — ${num(x.P)} pts`
+    + (x.meta?` · ${pct(x.pMeta)} da meta${x.bateu?" ✅":""}`:"")).join("\n");
+  const rede = `\n\nRede: ${num(R.tot.P)} pts`+(R.tot.meta?` · ${pct(R.tot.pMeta)} da meta`:"")
+    + (!R.fechada&&R.tot.ritmo?` · ritmo ${pct(R.tot.ritmo)}`:"");
+  const corre = !R.fechada ? "\n\n"+R.linhas.filter(x=>x.ritmo!=null&&x.ritmo<1&&x.meta).map(x=>`⚡ ${lojaNome(x.loja)}: faltam ${num(Math.max(0,x.meta-x.P))} pts para a meta`).slice(0,3).join("\n") : "";
+  return cab+"\n"+lin+rede+corre;
+}
+async function copiarWA(b){
+  try{ await navigator.clipboard.writeText($("waTxt").textContent); b.textContent="Copiado ✓"; }
+  catch(e){ const r=document.createRange(); r.selectNodeContents($("waTxt")); getSelection().removeAllRanges(); getSelection().addRange(r); b.textContent="Selecionado — copie com Ctrl+C"; }
+  setTimeout(()=>b.textContent="Copiar texto",2500);
+}
+
+/* ------------------------------ editor de regras */
+let ED=null;
+function novoCfg(){
+  const h=hojeD();
+  return {icone:"🏆", recorrencia:"mensal", inicio:iso(new Date(h.getFullYear(),h.getMonth(),1)), fim:null,
+    lojas:[1,2,3,5,8,9], grupos:[{id:"g1",nome:"",codigos:[],unidade:"UN",peso:1}],
+    meta:{modo:"anterior",crescimento:10,minimo:0,a_partir:null,fixas:{}},
+    regras:{contar_oferta:true,premio_so_com_meta:false}, premio:{valor_ponto:0,bonus_meta:0}};
+}
+function editar(id){
+  const c = id ? CAMPS.find(x=>x.id===id) : null;
+  ED = {id, nome: c?c.nome:"", ativa: c?c.ativa:true, cfg: JSON.parse(JSON.stringify(c?c.config:novoCfg()))};
+  ED.cfg.meta = Object.assign({modo:"anterior",crescimento:0,minimo:0,fixas:{}}, ED.cfg.meta||{});
+  ED.cfg.meta.fixas = ED.cfg.meta.fixas||{};
+  ED.cfg.regras = Object.assign({contar_oferta:true,premio_so_com_meta:false}, ED.cfg.regras||{});
+  ED.cfg.premio = Object.assign({valor_ponto:0,bonus_meta:0}, ED.cfg.premio||{});
+  ED.travados = new Set(c ? (c.config.grupos||[]).map(g=>g.id) : []);   // grupo já com história não troca de id
+  desenharEditor(); $("dlg").showModal();
+}
+function lerEditor(){
+  const v=id=>($(id)||{}).value;
+  ED.nome=v("eNome").trim(); ED.cfg.icone=v("eIco").trim()||"🏆"; ED.ativa=$("eAtiva").checked;
+  ED.cfg.recorrencia=v("eRec"); ED.cfg.inicio=v("eIni"); ED.cfg.fim=v("eFim")||null;
+  ED.cfg.lojas=[...document.querySelectorAll(".eLoja:checked")].map(x=>Number(x.value));
+  ED.cfg.grupos=ED.cfg.grupos.map((g,i)=>({id:g.id, nome:v("gN"+i).trim(),
+    codigos:String(v("gC"+i)).split(/[^0-9]+/).filter(Boolean).map(Number),
+    unidade:v("gU"+i), peso:Number(String(v("gP"+i)).replace(",","."))||0}));
+  ED.cfg.meta.modo=v("mModo"); ED.cfg.meta.crescimento=Number(String(v("mCres")).replace(",","."))||0;
+  ED.cfg.meta.minimo=Number(String(v("mMin")).replace(",","."))||0; ED.cfg.meta.a_partir=v("mAPartir")||null;
+  const fx={}; Object.keys(LOJAS).forEach(l=>{ const x=v("mFx"+l); if(x&&Number(x)>0) fx[l]=Number(String(x).replace(",",".")); });
+  ED.cfg.meta.fixas=fx;
+  ED.cfg.regras.contar_oferta=$("rOferta").checked; ED.cfg.regras.premio_so_com_meta=$("rSoMeta").checked;
+  ED.cfg.premio.valor_ponto=Number(String(v("pPonto")).replace(",","."))||0;
+  ED.cfg.premio.bonus_meta=Number(String(v("pBonus")).replace(",","."))||0;
+}
+function addGrupo(){ lerEditor(); ED.cfg.grupos.push({id:"g"+Date.now().toString(36),nome:"",codigos:[],unidade:"UN",peso:1}); desenharEditor(); }
+function delGrupo(i){
+  lerEditor();
+  if(ED.travados.has(ED.cfg.grupos[i].id) && !confirm("Esse grupo já tem venda registrada. Tirar da campanha faz os pontos dele sumirem do ranking. Continuar?")) return;
+  ED.cfg.grupos.splice(i,1); desenharEditor();
+}
+function desenharEditor(){
+  const c=ED.cfg, m=c.meta;
+  const nomes = g => g.codigos.map(x=>PRODS[x]?`${x} ${esc(PRODS[x])}`:`${x} (nome aparece após a próxima carga)`).join(" · ");
+  $("edBody").innerHTML = `
+    <h3>${ED.id?"Regras da campanha":"Nova campanha"}</h3>
+    <div class="g3" style="grid-template-columns:2fr .6fr 1fr">
+      <div><label>Nome</label><input id="eNome" value="${esc(ED.nome)}" placeholder="Ex.: Pão de Sal Premiado"></div>
+      <div><label>Ícone</label><input id="eIco" value="${esc(c.icone||"")}" maxlength="4"></div>
+      <div><label>&nbsp;</label><label class="check"><input type="checkbox" id="eAtiva" ${ED.ativa?"checked":""}> Campanha ativa</label></div>
+    </div>
+    <h4>Período</h4>
+    <div class="g3">
+      <div><label>Tipo</label><select id="eRec" onchange="lerEditor();desenharEditor()">
+        <option value="mensal" ${c.recorrencia==="mensal"?"selected":""}>Mensal (uma rodada por mês)</option>
+        <option value="unica" ${c.recorrencia==="unica"?"selected":""}>Período único</option></select></div>
+      <div><label>Início</label><input type="date" id="eIni" value="${esc(c.inicio||"")}"></div>
+      <div><label>Fim ${c.recorrencia==="mensal"?"(vazio = sem fim)":""}</label><input type="date" id="eFim" value="${esc(c.fim||"")}"></div>
+    </div>
+    <h4>Lojas participantes</h4>
+    <div class="row">${Object.keys(LOJAS).map(l=>`<label class="check"><input type="checkbox" class="eLoja" value="${l}" ${c.lojas.includes(Number(l))?"checked":""}> ${esc(LOJAS[l])}</label>`).join("")}</div>
+    <h4>Itens e pesos</h4>
+    <p class="desc">Cada grupo junta códigos do VR que contam igual (ex.: o mesmo item em dois cadastros). O peso é quantos pontos vale cada UN ou cada KG vendido.</p>
+    ${c.grupos.map((g,i)=>`<div class="grp">
+      <div><label>Grupo</label><input id="gN${i}" value="${esc(g.nome)}" placeholder="Ex.: Galeto inteiro"></div>
+      <div><label>Códigos do VR (separe por vírgula)</label><input id="gC${i}" value="${esc(g.codigos.join(", "))}" inputmode="numeric"></div>
+      <div><label>Unidade</label><select id="gU${i}"><option ${g.unidade==="UN"?"selected":""}>UN</option><option ${g.unidade==="KG"?"selected":""}>KG</option></select></div>
+      <div><label>Pontos por ${esc(g.unidade||"UN")}</label><input id="gP${i}" value="${esc(g.peso)}" inputmode="decimal"></div>
+      <div><button class="x" title="Tirar grupo" onclick="delGrupo(${i})">✕</button></div>
+      ${g.codigos.length?`<div class="nm">${nomes(g)}</div>`:""}
+    </div>`).join("")}
+    <button class="btn sec" style="margin-top:8px" onclick="addGrupo()">+ Grupo de itens</button>
+    <h4>Meta de cada loja</h4>
+    <div class="g3">
+      <div><label>Base</label><select id="mModo">
+        <option value="anterior" ${m.modo==="anterior"?"selected":""}>Mês anterior</option>
+        <option value="ano_passado" ${m.modo==="ano_passado"?"selected":""}>Mesmo mês do ano passado</option>
+        <option value="maior" ${m.modo==="maior"?"selected":""}>O maior dos dois</option></select></div>
+      <div><label>Crescimento sobre a base (%)</label><input id="mCres" value="${esc(m.crescimento)}" inputmode="decimal"></div>
+      <div><label>Meta mínima por loja (pontos)</label><input id="mMin" value="${esc(m.minimo)}" inputmode="decimal"></div>
+    </div>
+    <div class="g2" style="margin-top:8px">
+      <div><label>Meta só a partir do mês (vazio = já na 1ª rodada)</label><input type="month" id="mAPartir" value="${esc(m.a_partir||"")}"></div>
+    </div>
+    <p class="desc" style="margin-top:8px">Meta fixa por loja (opcional — substitui o cálculo; útil para loja sem histórico):</p>
+    <div class="row">${c.lojas.map(l=>`<div style="width:110px"><label>${esc(LOJAS[l])}</label><input id="mFx${l}" value="${esc(m.fixas[l]||"")}" placeholder="—" inputmode="decimal"></div>`).join("")}</div>
+    <h4>Regras e prêmio</h4>
+    <label class="check"><input type="checkbox" id="rOferta" ${c.regras.contar_oferta?"checked":""}> Venda em oferta conta ponto</label>
+    <label class="check"><input type="checkbox" id="rSoMeta" ${c.regras.premio_so_com_meta?"checked":""}> Só paga os pontos se a loja bater a meta</label>
+    <div class="g2" style="margin-top:6px">
+      <div><label>Valor do ponto (R$)</label><input id="pPonto" value="${esc(c.premio.valor_ponto)}" inputmode="decimal"></div>
+      <div><label>Bônus para quem bater a meta (R$)</label><input id="pBonus" value="${esc(c.premio.bonus_meta)}" inputmode="decimal"></div>
+    </div>
+    <p class="desc muted" style="margin-top:10px">Pesos, metas e prêmio recalculam na hora. Itens, lojas ou período novos dependem da próxima consulta ao VR (de 2 em 2 horas).</p>
+    <div id="edMsg" style="color:var(--critical);font-size:13px;margin-top:6px"></div>`;
+}
+async function salvarCampanha(){
+  lerEditor();
+  const c=ED.cfg, erro = !ED.nome ? "Dê um nome à campanha."
+    : !c.inicio ? "Informe o início." : (c.recorrencia==="unica"&&!c.fim) ? "Período único precisa de data de fim."
+    : (c.fim&&c.fim<c.inicio) ? "O fim está antes do início." : !c.lojas.length ? "Marque ao menos uma loja."
+    : !c.grupos.length || c.grupos.some(g=>!g.nome||!g.codigos.length) ? "Cada grupo precisa de nome e de pelo menos um código."
+    : c.grupos.some(g=>g.peso<=0) ? "Peso tem de ser maior que zero." : "";
+  if(erro){ $("edMsg").textContent=erro; return; }
+  c.grupos.forEach(g=>{ if(!ED.travados.has(g.id) && /^g\d+$|^g[a-z0-9]+$/.test(g.id)){
+    const base=normNome(g.nome).replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,24)||"grupo";
+    let id=base,k=2; while(c.grupos.some(o=>o!==g&&o.id===id)) id=base+"_"+(k++); g.id=id; }});
+  $("edSalvar").disabled=true;
+  try{
+    const corpo={nome:ED.nome, ativa:ED.ativa, config:c, atualizado_em:new Date().toISOString(), atualizado_por:sess.nome};
+    const r = ED.id ? await sbGrava("PATCH","cv_campanhas?id=eq."+ED.id,corpo) : await sbGrava("POST","cv_campanhas",corpo);
+    const salvo=r[0]; const i=CAMPS.findIndex(x=>x.id===salvo.id);
+    if(i>=0) CAMPS[i]=salvo; else CAMPS.unshift(salvo);
+    $("dlg").close();
+    if(SEL && SEL.id===salvo.id){ SEL=salvo; RODADA=rodadas(salvo.config).find(x=>RODADA&&x.id===RODADA.id)||rodadas(salvo.config).pop()||null; desenharCampanha(); }
+    else abrirCampanha(salvo.id);
+  }catch(e){ $("edMsg").textContent="Não salvou: "+String(e.message).slice(0,160); }
+  finally{ $("edSalvar").disabled=false; }
+}
+
+/* ------------------------------ início */
+(function(){
+  try{ const s=JSON.parse(localStorage.getItem("vpSess")||"null"); if(s&&s.id){ sess=s; return abrirApp(); } }catch(e){}
+  iniciarLogin();
+})();
+setInterval(()=>{ if(SEL && document.visibilityState==="visible" && !$("dlg").open) abrirCampanha(SEL.id, RODADA&&RODADA.id); }, 10*60*1000);
+</script>
+</body>
+</html>
