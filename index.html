@@ -100,6 +100,9 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .check{display:flex;align-items:center;gap:8px;font-size:14px;margin:4px 0}
 .check input{width:auto}
 .so-print,.so-print-inl{display:none}
+.abas{display:flex;gap:4px;border-bottom:2px solid var(--grid);margin:0 0 12px}
+.aba{background:none;border:0;padding:9px 14px;font-weight:600;color:var(--ink-2);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+.aba.on{color:var(--ink);border-bottom-color:var(--amber)}
 /* ---------- impressão / PDF ---------- */
 @page{size:A4 portrait;margin:12mm}
 @media print{
@@ -266,7 +269,7 @@ function rodadas(cfg){
 }
 
 /* ------------------------------ estado */
-let CAMPS=[], PRODS={}, SEL=null, DADOS=null, RODADA=null;
+let CAMPS=[], PRODS={}, SEL=null, DADOS=null, RODADA=null, ABA="lojas", OP_LOJA="rede";
 
 async function carregarLista(){
   $("app").innerHTML = `<div class="card muted">Carregando campanhas…</div>`;
@@ -283,7 +286,7 @@ async function carregarLista(){
 }
 function desenharLista(){
   history.replaceState(null,"",location.pathname);
-  SEL=null;
+  SEL=null; ABA="lojas"; OP_LOJA="rede";
   const card = c => {
     const cfg=c.config, r=rodadas(cfg), atual=r[r.length-1];
     const st = !c.ativa ? `<span class="pill">encerrada</span>`
@@ -312,7 +315,13 @@ async function abrirCampanha(id, rod){
     sbTudo(`cv_vendas?select=loja,dia,grupo,qtd,qtd_oferta,valor&campanha_id=eq.${id}&order=dia`),
     sbTudo(`cv_base?select=rodada,modo,loja,grupo,qtd,qtd_oferta,dias,ini,fim&campanha_id=eq.${id}`)
   ]);
-  DADOS={vendas:v, base:b};
+  // venda por operadora: se as tabelas ainda não existirem, a aba avisa em vez de quebrar
+  let vo=null, ops={};
+  try{
+    vo = await sbTudo(`cv_vendas_op?select=loja,dia,matricula,grupo,qtd,qtd_oferta&campanha_id=eq.${id}&order=dia`);
+    (await sbTudo("cv_operadoras?select=loja,matricula,nome")).forEach(o=>ops[o.loja+"|"+o.matricula]=o.nome);
+  }catch(e){ vo=null; }
+  DADOS={vendas:v, base:b, vendasOp:vo, ops};
   const rs = rodadas(SEL.config);
   RODADA = rs.find(r=>r.id===rod) || rs[rs.length-1] || null;
   desenharCampanha();
@@ -395,6 +404,7 @@ function desenharCampanha(){
   if(!RODADA){
     $("app").innerHTML = topoCampanha(c,rs)+`<div class="card muted">A campanha começa em ${ddmm(dt(cfg.inicio))}.</div>`; return;
   }
+  if(ABA==="operadoras"){ $("app").innerHTML = topoCampanha(c,rs) + telaOperadoras(c); return; }
   const R = calcular(cfg, RODADA);
   const semDados = !DADOS.vendas.length;
   const carga = c.ultima_carga ? new Date(c.ultima_carga) : null;
@@ -506,7 +516,99 @@ function topoCampanha(c,rs){
     <span style="float:right;color:#666">Emitido em ${esc(agora)}${sess?" por "+esc(sess.nome.split(" ")[0]):""}</span>
   </div>
   <h2>${esc(c.config.icone||"🏆")} ${esc(c.nome)}${RODADA?` <span class="so-print-inl" style="font-weight:400;color:#555">— ${esc(RODADA.nome)}</span>`:""}</h2>
-  ${rs.length>1?`<div class="chips" style="margin:10px 0 12px">${rs.slice().reverse().map(r=>`<span class="chip ${RODADA&&r.id===RODADA.id?"on":""}" onclick="trocarRodada('${r.id}')">${esc(r.nome)}</span>`).join("")}</div>`:`<div style="height:10px"></div>`}`;
+  ${rs.length>1?`<div class="chips" style="margin:10px 0 12px">${rs.slice().reverse().map(r=>`<span class="chip ${RODADA&&r.id===RODADA.id?"on":""}" onclick="trocarRodada('${r.id}')">${esc(r.nome)}</span>`).join("")}</div>`:`<div style="height:10px"></div>`}
+  ${RODADA?`<div class="abas nao-print">
+    <button class="aba ${ABA==="lojas"?"on":""}" onclick="trocarAba('lojas')">🏬 Lojas</button>
+    <button class="aba ${ABA==="operadoras"?"on":""}" onclick="trocarAba('operadoras')">🧑‍💼 Operadoras</button>
+  </div>`:""}`;
+}
+function trocarAba(a){ ABA=a; desenharCampanha(); window.scrollTo(0,0); }
+function trocarOpLoja(l){ OP_LOJA=l; desenharCampanha(); }
+
+/* ---------------- Aba Operadoras: quem passou cada item no caixa (matrícula do cupom no VR) */
+function calcOperadoras(cfg, rod){
+  const grupos = Object.fromEntries((cfg.grupos||[]).map(g=>[g.id,g]));
+  const contaOferta = cfg.regras?.contar_oferta!==false;
+  const ini=iso(rod.ini), fim=iso(rod.fim);
+  const lojas = new Set((cfg.lojas||[]).map(Number));
+  const vp = Number(cfg.premio?.valor_operadora||0);
+  const mapa = {};
+  (DADOS.vendasOp||[]).forEach(x=>{
+    if(x.dia<ini || x.dia>fim || !lojas.has(x.loja) || !grupos[x.grupo]) return;
+    const q = contaOferta ? Number(x.qtd) : Number(x.qtd)-Number(x.qtd_oferta);
+    const k = x.loja+"|"+x.matricula;
+    const o = mapa[k] || (mapa[k] = {loja:x.loja, matricula:x.matricula,
+      nome: DADOS.ops[k] || (x.matricula? "—" : "SEM MATRÍCULA"), P:0, porGrupo:{}, dias:new Set()});
+    o.P += q*Number(grupos[x.grupo].peso||0);
+    o.porGrupo[x.grupo] = (o.porGrupo[x.grupo]||0) + q;
+    if(q>0) o.dias.add(x.dia);
+  });
+  const lista = Object.values(mapa).filter(o=>o.P>0);
+  const totLoja = {}; lista.forEach(o=>totLoja[o.loja]=(totLoja[o.loja]||0)+o.P);
+  lista.forEach(o=>{ o.premio=o.P*vp; o.pctLoja = totLoja[o.loja]? o.P/totLoja[o.loja] : 0; });
+  lista.sort((a,b)=>b.P-a.P);
+  return {lista, vp, totLoja};
+}
+function telaOperadoras(c){
+  const cfg=c.config, gruposCols=cfg.grupos||[];
+  if(DADOS.vendasOp===null) return `<div class="card aviso">A venda por operadora ainda não está ligada no banco. Falta rodar o <b>setup_operadoras.sql</b> no Supabase.</div>`;
+  const {lista, vp, totLoja} = calcOperadoras(cfg, RODADA);
+  if(!lista.length) return `<div class="card aviso">Ainda não há venda por operadora nesta rodada. Ela entra na próxima carga do VR (06h, 08h … 20h).</div>`;
+  const soUnid = gruposCols.every(g=>Number(g.peso)===1 && g.unidade!=="KG");
+  const rot = soUnid ? "Unidades" : "Pontos";
+  const lojasCamp = (cfg.lojas||[]).map(Number);
+  const filtro = OP_LOJA==="rede" ? lista : lista.filter(o=>String(o.loja)===String(OP_LOJA));
+  const maxP = Math.max(1,...filtro.map(o=>o.P));
+  const lider = filtro[0];
+  const nomeOp = o => `<b>${esc(o.nome)}</b> <span class="muted">(${esc(o.matricula)})</span>`;
+  const umGrupo = soUnid && gruposCols.length===1;
+  // posição dentro da loja, para a visão da rede
+  const posLoja = {}; lojasCamp.forEach(l=>lista.filter(o=>o.loja===l).forEach((o,i)=>posLoja[o.loja+"|"+o.matricula]=i+1));
+  const totalPremio = filtro.reduce((s,o)=>s+o.premio,0);
+  const tituloFiltro = OP_LOJA==="rede" ? "rede" : LOJAS[OP_LOJA];
+  return `
+  <div class="chips nao-print" style="margin-bottom:12px">
+    <span class="chip ${OP_LOJA==="rede"?"on":""}" onclick="trocarOpLoja('rede')">Rede toda</span>
+    ${lojasCamp.map(l=>`<span class="chip ${String(OP_LOJA)===String(l)?"on":""}" onclick="trocarOpLoja(${l})">${esc(LOJAS[l])}</span>`).join("")}
+  </div>
+  <div class="card">
+    <div class="kpis">
+      <div class="kpi"><div class="l">Operadoras com venda</div><div class="v">${filtro.length}</div><div class="s">${esc(tituloFiltro)}</div></div>
+      <div class="kpi"><div class="l">${RODADA&&hojeD()>RODADA.fim?"Campeã":"Líder"}</div><div class="v" style="font-size:18px">${lider?esc(lider.nome):"—"}</div><div class="s">${lider?num(lider.P)+" "+rot.toLowerCase()+" · "+esc(LOJAS[lider.loja]):""}</div></div>
+      <div class="kpi"><div class="l">${rot} (${esc(OP_LOJA==="rede"?"rede":"loja")})</div><div class="v">${num(filtro.reduce((s,o)=>s+o.P,0))}</div><div class="s">média ${num(filtro.length? filtro.reduce((s,o)=>s+o.P,0)/filtro.length : 0,1)} por operadora</div></div>
+      <div class="kpi"><div class="l">Prêmio das operadoras</div><div class="v">${vp?brl(totalPremio):"—"}</div><div class="s">${vp?brl(vp)+" por "+(soUnid?"unidade":"ponto"):"defina em Regras da campanha"}</div></div>
+    </div>
+    <h3>Ranking das operadoras — ${esc(tituloFiltro)}</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>#</th><th class="l">Operadora</th>${OP_LOJA==="rede"?`<th class="l">Loja</th><th class="hm">Na loja</th>`:""}
+        ${umGrupo?"":gruposCols.map(g=>`<th class="hm">${esc(g.nome)}</th>`).join("")}
+        <th>${rot}</th><th style="width:24%">Comparado à líder</th><th class="hm">% da loja</th><th class="hm">Prêmio</th></tr></thead>
+      <tbody>${filtro.map((o,i)=>`<tr class="${i===0?"lider":""}">
+        <td>${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</td>
+        <td class="l">${nomeOp(o)}</td>
+        ${OP_LOJA==="rede"?`<td class="l">${lojaB(o.loja)}</td><td class="hm">${posLoja[o.loja+"|"+o.matricula]}º</td>`:""}
+        ${umGrupo?"":gruposCols.map(g=>`<td class="hm">${num(o.porGrupo[g.id]||0,g.unidade==="KG"?1:0)}</td>`).join("")}
+        <td><b>${num(o.P, soUnid?0:1)}</b></td>
+        <td><div class="bar"><i style="width:${o.P/maxP*100}%;${i===0?"background:var(--good)":""}"></i></div></td>
+        <td class="hm">${pct(o.pctLoja)}</td>
+        <td class="hm">${vp?brl(o.premio):"—"}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="desc muted" style="margin-top:8px">A operadora é quem passou o cupom no caixa (matrícula gravada no VR). Quem trabalha em duas lojas aparece uma vez em cada.
+      ${cfg.regras?.contar_oferta===false?"Venda em oferta não conta. ":""}</p>
+  </div>
+  <div class="card"><h3>Texto para o WhatsApp</h3><pre class="wa" id="waTxt">${esc(textoWAOperadoras(c, lista, lojasCamp, rot, vp))}</pre>
+    <button class="btn nao-print" onclick="copiarWA(this)">Copiar texto</button></div>`;
+}
+function textoWAOperadoras(c, lista, lojasCamp, rot, vp){
+  const med=["🥇","🥈","🥉"], u = rot==="Unidades"?"un.":"pts";
+  const corpo = (OP_LOJA==="rede" ? lojasCamp : [Number(OP_LOJA)]).map(l=>{
+    const ls = lista.filter(o=>o.loja===l).slice(0,3);
+    if(!ls.length) return "";
+    const todas = lista.filter(o=>o.loja===l);
+    const rotulo = o => todas.filter(x=>x.nome===o.nome).length>1 ? `${o.nome} (${o.matricula})` : o.nome;
+    return `*${LOJAS[l]}*\n`+ls.map((o,i)=>`${med[i]} ${rotulo(o)} — ${num(o.P)} ${u}${vp?" · "+brl(o.premio):""}`).join("\n");
+  }).filter(Boolean).join("\n\n");
+  return `${c.config.icone||"🏆"} *${c.nome.toUpperCase()} — OPERADORAS*\n${RODADA.nome}\n\n${corpo}`;
 }
 function imprimir(){
   const t = document.title;
@@ -587,6 +689,7 @@ function lerEditor(){
   ED.cfg.regras.contar_oferta=$("rOferta").checked; ED.cfg.regras.premio_so_com_meta=$("rSoMeta").checked;
   ED.cfg.premio.valor_ponto=Number(String(v("pPonto")).replace(",","."))||0;
   ED.cfg.premio.bonus_meta=Number(String(v("pBonus")).replace(",","."))||0;
+  ED.cfg.premio.valor_operadora=Number(String(v("pOp")).replace(",","."))||0;
 }
 function addGrupo(){ lerEditor(); ED.cfg.grupos.push({id:"g"+Date.now().toString(36),nome:"",codigos:[],unidade:"UN",peso:1}); desenharEditor(); }
 function delGrupo(i){
@@ -646,6 +749,7 @@ function desenharEditor(){
     <div class="g2" style="margin-top:6px">
       <div><label>Valor do ponto (R$)</label><input id="pPonto" value="${esc(c.premio.valor_ponto)}" inputmode="decimal"></div>
       <div><label>Bônus para quem bater a meta (R$)</label><input id="pBonus" value="${esc(c.premio.bonus_meta)}" inputmode="decimal"></div>
+      <div><label>Prêmio da operadora por ponto/unidade (R$)</label><input id="pOp" value="${esc(c.premio.valor_operadora||0)}" inputmode="decimal"></div>
     </div>
     <p class="desc muted" style="margin-top:10px">Pesos, metas e prêmio recalculam na hora. Itens, lojas ou período novos dependem da próxima consulta ao VR (de 2 em 2 horas).</p>
     <div id="edMsg" style="color:var(--critical);font-size:13px;margin-top:6px"></div>`;
