@@ -187,7 +187,7 @@ def carregar(camp, hoje, resumo):
     cid = camp["id"]
     rec = cfg.get("recorrencia", "mensal")
     modos = {"anterior": ["anterior"], "ano_passado": ["ano_passado"],
-             "maior": ["anterior", "ano_passado"]}.get(cfg.get("meta", {}).get("modo", "anterior"), ["anterior"])
+             "maior": ["anterior", "ano_passado"], "nenhuma": []}.get(cfg.get("meta", {}).get("modo", "anterior"), ["anterior"])
     fechadas = {r["rodada"] for r in sb_get(f"cv_rodadas?select=rodada&campanha_id=eq.{cid}&fechada=eq.true")}
     bases = {(b["rodada"], b["modo"]) for b in sb_get(f"cv_base?select=rodada,modo&campanha_id=eq.{cid}")}
     reconsultar = os.environ.get("RECARREGAR") == "1"
