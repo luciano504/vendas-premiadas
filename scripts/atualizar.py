@@ -62,18 +62,18 @@ def ids_sql(lst):
     return ",".join(str(int(x)) for x in lst) or "0"
 
 
-def vendas_vr(cfg, ini, fim):
-    """Quantidade por loja/dia/grupo entre ini e fim (inclusive)."""
+def vendas_vr(cfg, ini, fim, por_operadora=False):
+    """Quantidade por loja/dia/grupo (e por matrícula da operadora, se pedido) entre ini e fim."""
     grupos = [g for g in cfg.get("grupos", []) if g.get("codigos")]
     if not grupos:
-        return pd.DataFrame(columns=["loja", "dia", "grupo", "qtd", "qtd_oferta", "valor"])
+        return pd.DataFrame(columns=["loja", "dia", "grupo", "qtd", "qtd_oferta", "valor", "matricula"])
     todos = [c for g in grupos for c in g["codigos"]]
     caso = "case " + " ".join(
         f"when vi.id_produto in ({ids_sql(g['codigos'])}) then '{str(g['id']).replace(chr(39), '')}'"
         for g in grupos) + " end"
     lojas = [l for l in cfg.get("lojas", []) if int(l) in LOJAS_VALIDAS]
     sql = f"""
-        select v.id_loja as loja, date(v.data) as dia, {caso} as grupo,
+        select v.id_loja as loja, date(v.data) as dia, {caso} as grupo,{" coalesce(v.matricula,0) as matricula," if por_operadora else ""}
                sum(vi.quantidade) as qtd,
                sum(case when vi.oferta::text in ('true','t','1') then vi.quantidade else 0 end) as qtd_oferta,
                sum(vi.valortotal) as valor
@@ -83,19 +83,40 @@ def vendas_vr(cfg, ini, fim):
           and v.id_loja in ({ids_sql(lojas)})
           and vi.cancelado <> '1' and v.cancelado <> '1'
           and date(v.data) between '{ini}' and '{fim}'
-        group by 1, 2, 3
+        group by 1, 2, 3{", 4" if por_operadora else ""}
         union all
-        select 0, date '{ini}', 'x', 0, 0, 0
+        select 0, date '{ini}', 'x',{" 0," if por_operadora else ""} 0, 0, 0
     """
     df = query_vr(sql)
     if df.empty:
-        return pd.DataFrame(columns=["loja", "dia", "grupo", "qtd", "qtd_oferta", "valor"])
+        return pd.DataFrame(columns=["loja", "dia", "grupo", "qtd", "qtd_oferta", "valor", "matricula"])
     df = df[pd.to_numeric(df["loja"], errors="coerce").fillna(0) > 0].copy()
     df["loja"] = df["loja"].astype(int)
     for c in ("qtd", "qtd_oferta", "valor"):
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0).round(3)
     df["dia"] = df["dia"].astype(str).str[:10]
+    if por_operadora:
+        df["matricula"] = pd.to_numeric(df["matricula"], errors="coerce").fillna(0).astype(int)
     return df
+
+
+def nomes_operadoras(pares):
+    """Primeiro nome de cada (loja, matrícula). Só o primeiro nome sai do VR."""
+    if not pares:
+        return []
+    lojas = sorted({l for l, _ in pares}); mats = sorted({m for _, m in pares})
+    df = query_vr(f"select id_loja, matricula, nome from pdv.operador "
+                  f"where id_loja in ({ids_sql(lojas)}) and matricula in ({ids_sql(mats)})"
+                  " union all select 0, 0, ''")
+    out = {}
+    if not df.empty:
+        for r in df.itertuples():
+            par = (int(r.id_loja), int(r.matricula))
+            if par in pares and par not in out:
+                nome = str(r.nome or "").strip().split(" ")[0].upper() if str(r.nome or "").strip() else ""
+                out[par] = nome
+    return [{"loja": l, "matricula": m, "nome": out.get((l, m)) or ("SEM CADASTRO" if m else "SEM MATRÍCULA")}
+            for l, m in sorted(pares)]
 
 
 def descricoes_vr(codigos):
@@ -182,6 +203,9 @@ def janela_base(modo, rodada, ini, fim, recorrencia):
 
 
 # ------------------------------------------------------------- carga
+PARES_OP = set()   # (loja, matrícula) vistos nesta execução — para buscar os nomes no fim
+
+
 def carregar(camp, hoje, resumo):
     cfg = camp["config"]
     cid = camp["id"]
@@ -191,6 +215,12 @@ def carregar(camp, hoje, resumo):
     fechadas = {r["rodada"] for r in sb_get(f"cv_rodadas?select=rodada&campanha_id=eq.{cid}&fechada=eq.true")}
     bases = {(b["rodada"], b["modo"]) for b in sb_get(f"cv_base?select=rodada,modo&campanha_id=eq.{cid}")}
     reconsultar = os.environ.get("RECARREGAR") == "1"
+    try:   # se o setup_operadoras.sql ainda não rodou, segue sem a parte das operadoras
+        op_ok = {r["rodada"] for r in sb_get(f"cv_rodadas?select=rodada&campanha_id=eq.{cid}&op_carregado=eq.true")}
+        com_op = True
+    except Exception as e:
+        print("Venda por operadora desligada:", str(e)[:120])
+        op_ok, com_op = set(), False
 
     for rod, ini, fim in rodadas(cfg, hoje):
         fechar = hoje > fim + timedelta(days=DIAS_PARA_FECHAR)
@@ -207,6 +237,24 @@ def carregar(camp, hoje, resumo):
                                       "carregado_em": datetime.now(timezone.utc).isoformat()}],
                       "campanha_id,rodada")
             resumo.append(f"| {camp['nome']} | {rod} | vendas {ini:%d/%m}–{ate:%d/%m} | {len(linhas)} linhas |")
+
+        if com_op and (rod not in op_ok or rod not in fechadas or reconsultar):
+            try:
+                ate = min(fim, hoje)
+                df = vendas_vr(cfg, ini, ate, por_operadora=True)
+                sb_delete(f"cv_vendas_op?campanha_id=eq.{cid}&dia=gte.{ini}&dia=lte.{ate}")
+                linhas = [{"campanha_id": cid, "loja": int(r.loja), "dia": r.dia, "matricula": int(r.matricula),
+                           "grupo": str(r.grupo), "qtd": float(r.qtd), "qtd_oferta": float(r.qtd_oferta)}
+                          for r in df.itertuples()]
+                if linhas:
+                    sb_upsert("cv_vendas_op", linhas, "campanha_id,loja,dia,matricula,grupo")
+                    PARES_OP.update((x["loja"], x["matricula"]) for x in linhas)
+                sb_upsert("cv_rodadas", [{"campanha_id": cid, "rodada": rod, "op_carregado": fechar}],
+                          "campanha_id,rodada")
+                resumo.append(f"| {camp['nome']} | {rod} | por operadora | {len(linhas)} linhas |")
+            except Exception as e:
+                print(f"Operadoras da rodada {rod} não carregadas:", str(e)[:200])
+                resumo.append(f"| {camp['nome']} | {rod} | por operadora: **ERRO** {str(e)[:120]} | — |")
 
         for modo in modos:
             if (rod, modo) in bases and not reconsultar:
@@ -251,6 +299,11 @@ def main():
             print(f"ERRO na campanha {c['id']}: {msg}")
             resumo.append(f"| {c['nome']} | — | **ERRO** {msg} | — |")
             sb_patch(f"cv_campanhas?id=eq.{c['id']}", {"ultimo_erro": msg})
+    try:
+        if PARES_OP:
+            sb_upsert("cv_operadoras", nomes_operadoras(PARES_OP), "loja,matricula")
+    except Exception as e:
+        print("Nomes das operadoras não carregados:", str(e)[:200])
     try:
         prods = descricoes_vr(sorted(codigos))
         if prods:
