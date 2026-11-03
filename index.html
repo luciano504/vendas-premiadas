@@ -329,8 +329,9 @@ function calcular(cfg, rod){
   const corrDias = hoje>rod.fim ? totDias : Math.max(0, diasEntre(rod.ini,hoje));
   const fechada = hoje>rod.fim;
   const meta = cfg.meta||{};
-  const temMeta = !meta.a_partir || rod.id==="unica" || rod.id>=meta.a_partir;
-  const modos = meta.modo==="maior" ? ["anterior","ano_passado"] : [meta.modo||"anterior"];
+  const semMeta = meta.modo==="nenhuma";
+  const temMeta = !semMeta && (!meta.a_partir || rod.id==="unica" || rod.id>=meta.a_partir);
+  const modos = semMeta ? [] : meta.modo==="maior" ? ["anterior","ano_passado"] : [meta.modo||"anterior"];
   const lojas = (cfg.lojas||[]).map(Number);
   const vRod = DADOS.vendas.filter(x=>x.dia>=ini && x.dia<=fim);
   const ultimoDiaComVenda = vRod.reduce((m,x)=>x.dia>m?x.dia:m,"");
@@ -382,7 +383,8 @@ function calcular(cfg, rod){
   };
   tot.pMeta = tot.meta? tot.P/tot.meta : null;
   tot.ritmo = tot.meta? tot.P/(tot.meta*corrDias/totDias||1) : null;
-  return {linhas, tot, totDias, corrDias, fechada, temMeta, ultimoDiaComVenda};
+  if(semMeta){ linhas.sort((a,b)=>b.P-a.P); linhas.forEach((x,i)=>x.pos=i+1); }
+  return {linhas, tot, totDias, corrDias, fechada, temMeta, semMeta, ultimoDiaComVenda};
 }
 
 /* ------------------------------ tela da campanha */
@@ -399,12 +401,13 @@ function desenharCampanha(){
   const avisos = [];
   if(c.ultimo_erro) avisos.push(`<div class="aviso erro"><b>A última carga do VR falhou:</b> ${esc(c.ultimo_erro)}</div>`);
   if(semDados) avisos.push(`<div class="aviso">Ainda não há venda carregada. O VR é consultado às 06h, 08h, 10h … 20h — a campanha aparece depois da próxima carga.</div>`);
-  if(!R.temMeta) avisos.push(`<div class="aviso">Rodada de <b>base</b>: ainda sem meta (as metas começam em ${esc(cfg.meta.a_partir)}). Ranking por pontos.</div>`);
-  else if(R.linhas.some(x=>x.meta==null)) avisos.push(`<div class="aviso">Loja sem venda na base e sem meta mínima: fica sem % até ganhar meta fixa no editor.</div>`);
+  if(!R.temMeta && !R.semMeta) avisos.push(`<div class="aviso">Rodada de <b>base</b>: ainda sem meta (as metas começam em ${esc(cfg.meta.a_partir)}). Ranking por pontos.</div>`);
+  else if(R.temMeta && R.linhas.some(x=>x.meta==null)) avisos.push(`<div class="aviso">Loja sem venda na base e sem meta mínima: fica sem % até ganhar meta fixa no editor.</div>`);
 
   const vPonto = Number(cfg.premio?.valor_ponto||0);
   const gruposCols = (cfg.grupos||[]);
   const rotRitmo = R.fechada ? "" : `<th class="hm">Ritmo</th>`;
+  if(R.semMeta){ $("app").innerHTML = topoCampanha(c,rs) + avisos.join("") + campanhaSemMeta(c,R,gruposCols,vPonto,carga); return; }
   $("app").innerHTML = topoCampanha(c,rs) + avisos.join("") + `
   <div class="card">
     <div class="kpis">
@@ -439,6 +442,55 @@ function desenharCampanha(){
   <div class="card"><h3>Evolução do % da meta</h3>${grafico(R)}</div>
   <div class="card"><h3>Texto para o WhatsApp</h3><pre class="wa" id="waTxt">${esc(textoWA(c,R))}</pre>
     <button class="btn nao-print" onclick="copiarWA(this)">Copiar texto</button></div>`;
+}
+/* Campanha sem meta: ganha quem fizer mais pontos. A barra mostra cada loja em relação ao líder. */
+function campanhaSemMeta(c,R,gruposCols,vPonto,carga){
+  const cfg=c.config, lider=R.linhas[0], maxP=Math.max(1,...R.linhas.map(x=>x.P));
+  const soUnid = gruposCols.every(g=>Number(g.peso)===1 && g.unidade!=="KG");
+  const rot = soUnid ? "Unidades" : "Pontos";
+  return `
+  <div class="card">
+    <div class="kpis">
+      <div class="kpi"><div class="l">${rot} da rede</div><div class="v">${num(R.tot.P)}</div><div class="s">sem meta · ranking por ${rot.toLowerCase()}</div></div>
+      <div class="kpi"><div class="l">${R.fechada?"Campeã":"Líder"}</div><div class="v" style="font-size:18px">${lider&&lider.P>0?esc(lojaNome(lider.loja)):"—"}</div><div class="s">${lider&&lider.P>0?num(lider.P)+" "+rot.toLowerCase():""}</div></div>
+      <div class="kpi"><div class="l">Andamento</div><div class="v">${R.fechada?"Encerrada":"Dia "+R.corrDias}</div><div class="s">${R.fechada?"":"de "+R.totDias+" · até "+ddmm(RODADA.fim)}</div></div>
+      <div class="kpi"><div class="l">Prêmio ${R.fechada?"apurado":"acumulado"}</div><div class="v">${brl(R.tot.premio)}</div><div class="s">${vPonto?brl(vPonto)+" por "+(soUnid?"unidade":"ponto"):""}</div></div>
+    </div>
+    <h3>Ranking — ${rot.toLowerCase()}</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>#</th><th class="l">Loja</th>
+        ${soUnid&&gruposCols.length===1?"":gruposCols.map(g=>`<th class="hm">${esc(g.nome)}</th>`).join("")}
+        <th>${rot}</th><th style="width:30%">Comparado ao líder</th><th class="hm">Média/dia</th><th class="hm">Prêmio</th></tr></thead>
+      <tbody>${R.linhas.map(x=>`<tr class="${x.pos===1&&x.P>0?"lider":""}">
+        <td>${x.pos===1&&x.P>0?"🥇":x.pos===2&&x.P>0?"🥈":x.pos===3&&x.P>0?"🥉":x.pos}</td>
+        <td class="l">${lojaB(x.loja)}${esc(lojaNome(x.loja))}</td>
+        ${soUnid&&gruposCols.length===1?"":gruposCols.map(g=>`<td class="hm">${num(x.porGrupo[g.id],g.unidade==="KG"?1:0)}${g.unidade==="KG"?" kg":""}</td>`).join("")}
+        <td><b>${num(x.P)}</b></td>
+        <td><div class="bar"><i style="width:${x.P/maxP*100}%;${x.pos===1&&x.P>0?"background:var(--good)":""}"></i></div></td>
+        <td class="hm">${num(R.corrDias?x.P/R.corrDias:0,1)}</td>
+        <td class="hm">${brl(x.premio)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <p class="desc muted" style="margin-top:8px">Campanha sem meta: ganha a loja que vender mais. ${cfg.regras?.contar_oferta===false?"Venda em oferta não conta. ":""}
+      ${carga?"Dados do VR de "+carga.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+".":""}</p>
+  </div>
+  <div class="card"><h3>Evolução — ${soUnid?"unidades acumuladas":"pontos acumulados"}</h3>${graficoPontos(R)}</div>
+  <div class="card"><h3>Texto para o WhatsApp</h3><pre class="wa" id="waTxt">${esc(textoWA(c,R))}</pre>
+    <button class="btn nao-print" onclick="copiarWA(this)">Copiar texto</button></div>`;
+}
+function graficoPontos(R){
+  const L=R.linhas, n=R.totDias;
+  if(!R.corrDias || !L.some(x=>x.P>0)) return `<p class="desc muted">O gráfico aparece quando houver venda na rodada.</p>`;
+  const W=760,H=240,pl=40,pr=12,pt=10,pb=24, maxY=Math.max(...L.map(x=>x.P))*1.08;
+  const X=i=>pl+(W-pl-pr)*(n<=1?1:i/(n-1)), Y=v=>pt+(H-pt-pb)*(1-v/maxY);
+  let g="";
+  [0,.5,1].forEach(f=>{ const v=Math.round(maxY*f/1.08); g+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text x="${pl-6}" y="${Y(v)+4}" text-anchor="end">${num(v)}</text>`; });
+  [1,Math.ceil(n/2),n].forEach((d,k)=>g+=`<text x="${X(d-1)}" y="${H-6}" text-anchor="${k===0?"start":k===2?"end":"middle"}">dia ${d}</text>`);
+  L.forEach(x=>{
+    const pts=x.serie.map((v,i)=>X(i).toFixed(1)+","+Y(v).toFixed(1)).join(" ");
+    g+=`<polyline points="${pts}" fill="none" stroke="${LOJA_COR[x.loja]}" stroke-width="2"><title>${esc(LOJAS[x.loja])}</title></polyline><circle cx="${X(x.serie.length-1)}" cy="${Y(x.serie[x.serie.length-1])}" r="3" fill="${LOJA_COR[x.loja]}"/>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img" aria-label="Evolução acumulada por loja">${g}</svg>
+    <div class="chips" style="margin-top:6px">${L.map(x=>`<span style="font-size:12px">${lojaB(x.loja)}${esc(lojaNome(x.loja))}</span>`).join("")}</div>`;
 }
 function topoCampanha(c,rs){
   const agora = new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
@@ -487,9 +539,10 @@ function textoWA(c,R){
   const cfg=c.config, med=["🥇","🥈","🥉"];
   const cab = `${cfg.icone||"🏆"} *${c.nome.toUpperCase()}* — ${RODADA.nome}\n`
     + (R.fechada?"*Resultado final*\n":`Parcial até ${R.ultimoDiaComVenda?ddmm(dt(R.ultimoDiaComVenda)):"hoje"} (dia ${R.corrDias} de ${R.totDias})\n`);
-  const lin = R.linhas.map((x,i)=>`${med[i]||(i+1)+"º"} ${lojaNome(x.loja)} — ${num(x.P)} pts`
+  const un = R.semMeta && (c.config.grupos||[]).every(g=>Number(g.peso)===1&&g.unidade!=="KG") ? "un." : "pts";
+  const lin = R.linhas.map((x,i)=>`${med[i]||(i+1)+"º"} ${lojaNome(x.loja)} — ${num(x.P)} ${un}`
     + (x.meta?` · ${pct(x.pMeta)} da meta${x.bateu?" ✅":""}`:"")).join("\n");
-  const rede = `\n\nRede: ${num(R.tot.P)} pts`+(R.tot.meta?` · ${pct(R.tot.pMeta)} da meta`:"")
+  const rede = `\n\nRede: ${num(R.tot.P)} ${un}`+(R.tot.meta?` · ${pct(R.tot.pMeta)} da meta`:"")
     + (!R.fechada&&R.tot.ritmo?` · ritmo ${pct(R.tot.ritmo)}`:"");
   const corre = !R.fechada ? "\n\n"+R.linhas.filter(x=>x.ritmo!=null&&x.ritmo<1&&x.meta).map(x=>`⚡ ${lojaNome(x.loja)}: faltam ${num(Math.max(0,x.meta-x.P))} pts para a meta`).slice(0,3).join("\n") : "";
   return cab+"\n"+lin+rede+corre;
@@ -577,7 +630,8 @@ function desenharEditor(){
       <div><label>Base</label><select id="mModo">
         <option value="anterior" ${m.modo==="anterior"?"selected":""}>Mês anterior</option>
         <option value="ano_passado" ${m.modo==="ano_passado"?"selected":""}>Mesmo mês do ano passado</option>
-        <option value="maior" ${m.modo==="maior"?"selected":""}>O maior dos dois</option></select></div>
+        <option value="maior" ${m.modo==="maior"?"selected":""}>O maior dos dois</option>
+        <option value="nenhuma" ${m.modo==="nenhuma"?"selected":""}>Sem meta (ganha quem vender mais)</option></select></div>
       <div><label>Crescimento sobre a base (%)</label><input id="mCres" value="${esc(m.crescimento)}" inputmode="decimal"></div>
       <div><label>Meta mínima por loja (pontos)</label><input id="mMin" value="${esc(m.minimo)}" inputmode="decimal"></div>
     </div>
