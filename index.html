@@ -99,6 +99,31 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .x{background:none;border:0;color:var(--critical);font-size:18px;cursor:pointer}
 .check{display:flex;align-items:center;gap:8px;font-size:14px;margin:4px 0}
 .check input{width:auto}
+.so-print,.so-print-inl{display:none}
+/* ---------- impressão / PDF ---------- */
+@page{size:A4 portrait;margin:12mm}
+@media print{
+  :root,:root[data-theme="dark"]{
+    color-scheme:light;--plane:#fff;--surface:#fff;--surface-2:#f4f5f7;
+    --ink:#000;--ink-2:#333;--muted:#666;--grid:#d6d6d6;--baseline:#999;
+    --good-text:#006300;--warning:#8a5f00;--bar:#2a78d6;
+  }
+  body{background:#fff;font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  header.top,.nao-print,.chips,#dlg,#login{display:none!important}
+  .so-print{display:block}
+  .so-print-inl{display:inline}
+  main{max-width:none;padding:0}
+  .card{box-shadow:none;border:1px solid #ddd;padding:10px;margin-bottom:8px;break-inside:avoid}
+  .tbl-wrap{max-height:none;overflow:visible}
+  th{position:static}
+  .hm{display:table-cell!important}
+  th,td{padding:5px 4px;font-size:11px}
+  .kpis{grid-template-columns:repeat(4,1fr)!important;gap:6px;margin:6px 0}
+  .kpi .v{font-size:17px}
+  .aviso{border:1px solid #e0c060}
+  pre.wa{font-size:10.5px;background:#fff;border:1px solid #ddd}
+  h2{font-size:17px}
+}
 </style>
 </head>
 <body>
@@ -413,15 +438,29 @@ function desenharCampanha(){
   </div>
   <div class="card"><h3>Evolução do % da meta</h3>${grafico(R)}</div>
   <div class="card"><h3>Texto para o WhatsApp</h3><pre class="wa" id="waTxt">${esc(textoWA(c,R))}</pre>
-    <button class="btn" onclick="copiarWA(this)">Copiar texto</button></div>`;
+    <button class="btn nao-print" onclick="copiarWA(this)">Copiar texto</button></div>`;
 }
 function topoCampanha(c,rs){
-  return `<div class="row" style="justify-content:space-between;margin-bottom:12px">
+  const agora = new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  return `<div class="row nao-print" style="justify-content:space-between;margin-bottom:12px">
     <div><button class="btn sec" onclick="desenharLista()">‹ Campanhas</button></div>
-    ${podeEditar()?`<button class="btn sec" onclick="editar(${c.id})">✏️ Regras da campanha</button>`:""}
+    <div class="row">
+      ${RODADA?`<button class="btn sec" onclick="imprimir()">🖨️ Imprimir / PDF</button>`:""}
+      ${podeEditar()?`<button class="btn sec" onclick="editar(${c.id})">✏️ Regras da campanha</button>`:""}
+    </div>
   </div>
-  <h2>${esc(c.config.icone||"🏆")} ${esc(c.nome)}</h2>
+  <div class="so-print" style="border-bottom:3px solid #1F3864;margin-bottom:8px;padding-bottom:4px">
+    <b style="color:#1F3864">Rende Mais · Vendas Premiadas</b>
+    <span style="float:right;color:#666">Emitido em ${esc(agora)}${sess?" por "+esc(sess.nome.split(" ")[0]):""}</span>
+  </div>
+  <h2>${esc(c.config.icone||"🏆")} ${esc(c.nome)}${RODADA?` <span class="so-print-inl" style="font-weight:400;color:#555">— ${esc(RODADA.nome)}</span>`:""}</h2>
   ${rs.length>1?`<div class="chips" style="margin:10px 0 12px">${rs.slice().reverse().map(r=>`<span class="chip ${RODADA&&r.id===RODADA.id?"on":""}" onclick="trocarRodada('${r.id}')">${esc(r.nome)}</span>`).join("")}</div>`:`<div style="height:10px"></div>`}`;
+}
+function imprimir(){
+  const t = document.title;
+  document.title = (SEL.nome+" "+(RODADA?RODADA.nome:"")).replace(/[\/\\:*?"<>|]+/g,"-");  // vira o nome do PDF
+  window.print();
+  setTimeout(()=>document.title=t, 1000);
 }
 function trocarRodada(id){ RODADA=rodadas(SEL.config).find(r=>r.id===id); desenharCampanha(); }
 
